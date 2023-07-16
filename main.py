@@ -14,12 +14,13 @@ def decrease_hunger_level():
 @bot.message_handler(commands=['hunger_level'])
 def get_hunger_level(message):
     hunger = gnome.get_hunger_level()
-    bot.reply_to(message, f"Сыстость гнома составляет {hunger}%")
+    bot.reply_to(message, f"Ваш гном {dw.level_of_hunger(hunger)}")
+    print(hunger)
 
 def schedule_checker():
     while True:
         decrease_hunger_level()
-        sleep(15*60)
+        sleep(1)
 
 def main():
 

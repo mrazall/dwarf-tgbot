@@ -18,7 +18,7 @@ def initialize_meat_grid():
 
 def random_meat():
     a = random.randint(1, 100)
-    if 1 < a <= 30:
+    if 1 <= a <= 10:
         return 4
     if 10 < a <= 30:
         return 7
@@ -176,6 +176,30 @@ def increase_hunger_level(user_id):
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
+    markup_inline = InlineKeyboardMarkup()
+    markup_inline.row_width = 2
+    markup_inline.add(
+        InlineKeyboardButton("Создать гнома", callback_data="create_gnome"),
+        InlineKeyboardButton("Мои гномы", callback_data="my_gnomes"),
+        InlineKeyboardButton("Посмотреть уровень голода",
+                             callback_data="hunger_level"),
+        InlineKeyboardButton("Покормить гнома", callback_data="feed_gnome"),
+        InlineKeyboardButton("Проверить запасы", callback_data="show_meat"),
+        InlineKeyboardButton("Отправится на охоту",
+                             callback_data="go_on_expedition")
+    )
+    markup_reply = ReplyKeyboardMarkup(resize_keyboard=True)
+    reply_button = KeyboardButton("Меню")
+    markup_reply.add(reply_button)
+
+    bot.send_message(user_id, "Выберите действие:", reply_markup=markup_inline)
+    bot.send_message(
+        user_id, "Используйте кнопку 'Меню', чтобы открыть основное меню.", reply_markup=markup_reply)
+
+
+@bot.message_handler(func=lambda message: message.text == "Меню")
+def handle_reply(message):
+    user_id = message.from_user.id
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
     markup.add(
@@ -188,7 +212,7 @@ def start(message):
         InlineKeyboardButton("Отправится на охоту",
                              callback_data="go_on_expedition")
     )
-    bot.send_message(user_id, "Выберите действие:", reply_markup=markup)
+    bot.send_message(user_id, "Основное меню:", reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -309,7 +333,7 @@ def handle_feed_gnome(message, user_id):
             message, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
 
 
-def schedule_checker():
+def schedule_checker_hunger():
     while True:
         with sq.connect("gnomes.db") as con:
             cursor = con.cursor()
@@ -317,13 +341,24 @@ def schedule_checker():
             user_ids = cursor.fetchall()
             for user_id in user_ids:
                 decrease_hunger_level(user_id[0])
+            sleep(1000)
+
+
+def schedule_checker_tickets():
+    while True:
+        with sq.connect("gnomes.db") as con:
+            cursor = con.cursor()
+            cursor.execute("SELECT user_id FROM users_gnomes")
+            user_ids = cursor.fetchall()
+            for user_id in user_ids:
                 increase_tickets(user_id[0])
-            sleep(10)
+            sleep(30)
 
 
 def main():
     initialize_meat_grid()
-    Thread(target=schedule_checker).start()
+    Thread(target=schedule_checker_hunger).start()
+    Thread(target=schedule_checker_tickets).start()
     bot.infinity_polling()
 
 

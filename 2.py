@@ -1,10 +1,16 @@
 import telebot
 import schedule
 import dw
+import random
+import math
 from threading import Thread
 import sqlite3 as sq
 from time import sleep
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+
+# Один кусок мяс восстанавливает 10 единиц голода
 
 with sq.connect("gnomes.db") as con:
     cur = con.cursor()
@@ -33,7 +39,7 @@ def create_gnome(user_id, gnome_name):
         gnome = dw.Dwarf(gnome_name)
         gnome.feed(100)
         cursor.execute("INSERT INTO users_gnomes (user_id, gnome_name, hunger_level, meat) VALUES (?, ?, ?, ?)",
-                       (user_id, gnome_name, 100, 100))
+                       (user_id, gnome_name, 100, 10))
     return gnome
 
 
@@ -61,9 +67,7 @@ def get_all_gnomes_names(user_id):
         return [row[0] for row in rows]
 
 
-@bot.message_handler(commands=['my_gnomes'])
-def chat_show_my_gnomes(message):
-    user_id = message.from_user.id
+def chat_show_my_gnomes(message, user_id):
     gnome_names = get_all_gnomes_names(user_id)
     if gnome_names:
         response = "Ваши гномы:\n" + "\n".join(gnome_names)
@@ -78,7 +82,6 @@ def decrease_hunger_level(user_id):
         with sq.connect("gnomes.db") as con:
             gnome.starve(10)
             hunger = gnome.get_hunger_level()
-            print(hunger)
             cursor = con.cursor()
             cursor.execute(
                 "UPDATE users_gnomes SET hunger_level=? WHERE user_id=?", (hunger, user_id))
@@ -93,55 +96,91 @@ def show_meat(user_id):
         return row[0]
 
 
+def count_piece_of_meat_to_feed(hunger):
+    if hunger >= 85:
+        return 0
+    necessity = int(math.ceil((100 - hunger)/10))
+    return necessity
+
+
 def increase_hunger_level(user_id):
     gnome = get_gnome(user_id)
     if gnome:
         with sq.connect("gnomes.db") as con:
-            gnome.feed(15)
             hunger = gnome.get_hunger_level()
+            meat = show_meat(user_id)
+            necessity = count_piece_of_meat_to_feed(hunger)
+            if meat == 0:
+                return None
+            if meat >= necessity:
+                gnome.feed(necessity*10)
+                hunger = gnome.get_hunger_level()
 
-            cursor = con.cursor()
-            cursor.execute(
-                "UPDATE users_gnomes SET hunger_level=? WHERE user_id=?", (hunger, user_id))
-            meat = show_meat(user_id) - 5
-            cursor.execute(
-                "UPDATE users_gnomes SET meat=? WHERE user_id=?", (meat, user_id))
+                meat -= necessity
+                cursor = con.cursor()
+                cursor.execute(
+                    "UPDATE users_gnomes SET hunger_level=? WHERE user_id=?", (hunger, user_id))
+                cursor.execute(
+                    "UPDATE users_gnomes SET meat=? WHERE user_id=?", (meat, user_id))
+            else:
+                gnome.feed(meat*10)
+                meat = 0
+                cursor = con.cursor()
+                cursor.execute(
+                    "UPDATE users_gnomes SET hunger_level=? WHERE user_id=?", (hunger, user_id))
+                cursor.execute(
+                    "UPDATE users_gnomes SET meat=? WHERE user_id=?", (meat, user_id))
 
 
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
-    markup = ReplyKeyboardMarkup(resize_keyboard=True)
-    button_create_gnome = KeyboardButton("Создать гнома")
-    button_hunger = KeyboardButton("Посмотреть уровень голода")
-    button_my_gnomes = KeyboardButton("Мои гномы")
-    button_feed_gnome = KeyboardButton("Покормить гнома")
-    button_show_meat = KeyboardButton("Проверить запасы")
-    markup.add(button_create_gnome, button_my_gnomes)
-    markup.add(button_hunger, button_feed_gnome)
-    markup.add(button_show_meat)
-
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(
+        InlineKeyboardButton("Создать гнома", callback_data="create_gnome"),
+        InlineKeyboardButton("Мои гномы", callback_data="my_gnomes"),
+        InlineKeyboardButton("Посмотреть уровень голода",
+                             callback_data="hunger_level"),
+        InlineKeyboardButton("Покормить гнома", callback_data="feed_gnome"),
+        InlineKeyboardButton("Проверить запасы", callback_data="show_meat")
+    )
     bot.send_message(user_id, "Выберите действие:", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda message: message.text == "Мои гномы")
-def handle_my_gnomes(message):
-    chat_show_my_gnomes(message)
+@bot.callback_query_handler(func=lambda call: True)
+def handle_callback_query(call):
+    user_id = call.from_user.id
+    data = call.data
+    if data == "create_gnome":
+        handle_create_gnome(call.message, user_id)
+        bot.answer_callback_query(call.id)
+
+    elif data == "my_gnomes":
+        chat_show_my_gnomes(call.message, user_id)
+
+    elif data == "hunger_level":
+        chat_get_hunger_level(call.message, user_id)
+
+    elif data == "feed_gnome":
+        handle_feed_gnome(call.message, user_id)
+
+    elif data == "show_meat":
+        handle_show_meat(call.message, user_id)
 
 
-@bot.message_handler(func=lambda message: message.text == "Проверить запасы")
-def handle_show_meat(message):
-    user_id = message.from_user.id
+def handle_my_gnomes(message, user_id):
+    chat_show_my_gnomes(message, user_id)
+
+
+def handle_show_meat(message, user_id):
     amount_of_meat = show_meat(user_id)
     bot.send_message(
         user_id, f"В ваших запасах есть {amount_of_meat} кусков мяса")
 
 
-@bot.message_handler(func=lambda message: message.text == "Создать гнома")
-def handle_create_gnome(message):
-    user_id = message.from_user.id
+def handle_create_gnome(message, user_id):
     gnome = get_gnome(user_id)
-    
     if gnome:
         bot.send_message(
             user_id, "У вас уже есть гном. Вы не можете создать больше.")
@@ -154,20 +193,18 @@ def handle_create_gnome(message):
 def create_gnome_and_notify(user_id, gnome_name):
     gnome = create_gnome(user_id, gnome_name)
     if gnome:
-        bot.send_message(user_id, f"{gnome_name} выбрался из темной пещеры.")
+        bot.send_message(user_id, f"{gnome_name} выбрался из темной пещеры!")
     else:
         bot.send_message(
             user_id, "Не удалось создать гнома. Попробуйте еще раз или обратитесь за помощью.")
 
 
-@bot.message_handler(func=lambda message: message.text == "Посмотреть уровень голода")
-def handle_hunger_level(message):
-    chat_get_hunger_level(message)
+def handle_hunger_level(message, user_id):
+    chat_get_hunger_level(message, user_id)
 
 
-@bot.message_handler(commands=['hunger_level'])
-def chat_get_hunger_level(message):
-    user_id = message.from_user.id
+def chat_get_hunger_level(message, user_id):
+
     gnome = get_gnome(user_id)
     if gnome:
         hunger = gnome.get_hunger_level()
@@ -178,19 +215,23 @@ def chat_get_hunger_level(message):
             message, "У вас еще нет гнома. Используйте команду /start, чтобы создать его.")
 
 
-@bot.message_handler(func=lambda message: message.text == "Покормить гнома")
-def handle_feed_gnome(message):
-    user_id = message.from_user.id
+def handle_feed_gnome(message, user_id):
     gnome = get_gnome(user_id)
-
     if gnome:
-        increase_hunger_level(user_id)
-        hunger = gnome.get_hunger_level()
-        bot.send_message(
-            user_id, f"Вы покормили {gnome.name}! Теперь он {dw.level_of_hunger(hunger)}")
+        if increase_hunger_level(user_id):
+            gnome = get_gnome(user_id)
+            if show_meat(user_id) != 0:
+                bot.reply_to(
+                    message, f"Вы покормили {gnome.name}! Теперь он {dw.level_of_hunger(gnome.get_hunger_level())}")
+            else:
+                bot.reply_to(
+                    message, f"Вы покормили {gnome.name}! Теперь он {dw.level_of_hunger(gnome.get_hunger_level())}. Запасы мяса иссякли!")
+        else:
+            bot.reply_to(
+                message, f"Запасы мяса иссякли - скорее отправляйтесь на охоту!")
     else:
-        bot.send_message(
-            user_id, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
+        bot.reply_to(
+            message, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
 
 
 def schedule_checker():

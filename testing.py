@@ -19,15 +19,15 @@ def initialize_meat_grid():
 def random_meat():
     a = random.randint(1, 100)
     if 1 <= a <= 10:
-        return 4
+        return 0
     if 10 < a <= 30:
-        return 7
+        return random.randint(1,3)
     if 30 < a <= 70:
-        return 10
+        return random.randint(3,7)
     if 70 < a <= 95:
-        return 16
+        return random.randint(6, 15)
     if 95 < a <= 100:
-        return 20
+        return random.randint(15, 20)
 
 
 with sq.connect("gnomes.db") as con:
@@ -106,7 +106,10 @@ def decrease_hunger_level(user_id):
             cursor = con.cursor()
             cursor.execute(
                 "UPDATE users_gnomes SET hunger_level=? WHERE user_id=? AND is_dead!=1", (hunger, user_id))
-            if hunger == 0:
+            if hunger < 30:
+                bot.send_message(
+                    user_id, f"{gnome.name} адски голоден!")
+            elif hunger == 0:
                 cursor.execute(
                     "UPDATE users_gnomes SET is_dead=? WHERE user_id=?", (1, user_id))
                 bot.send_message(
@@ -124,6 +127,9 @@ def increase_tickets(user_id):
             amount = min(3, row[0]+1)
             cursor.execute(
                 "UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1", (amount, user_id))
+            if amount == 3:
+                bot.send_message(
+                    user_id, f"{gnome.name} вновь полон сил для охоты!")
 
 
 def show_meat(user_id):
@@ -341,7 +347,7 @@ def schedule_checker_hunger():
             user_ids = cursor.fetchall()
             for user_id in user_ids:
                 decrease_hunger_level(user_id[0])
-            sleep(1000)
+            sleep(600)
 
 
 def schedule_checker_tickets():
@@ -352,7 +358,7 @@ def schedule_checker_tickets():
             user_ids = cursor.fetchall()
             for user_id in user_ids:
                 increase_tickets(user_id[0])
-            sleep(30)
+            sleep(300)
 
 
 def main():

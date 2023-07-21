@@ -11,6 +11,10 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 # Один кусок мяс восстанавливает 10 единиц голода
+def initialize_meat_grid():
+    meat_grid = [[random.randint(1, 10) for _ in range(3)] for _ in range(3)]
+    return meat_grid
+
 
 with sq.connect("gnomes.db") as con:
     cur = con.cursor()

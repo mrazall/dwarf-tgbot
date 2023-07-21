@@ -11,6 +11,24 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 
 # Один кусок мяс восстанавливает 10 единиц голода
+def initialize_meat_grid():
+    meat_grid = [[random.randint(1, 10) for _ in range(3)] for _ in range(3)]
+    return meat_grid
+
+
+def random_meat():
+    a = random.randint(1, 100)
+    if 1 < a <= 30:
+        return 4
+    if 10 < a <= 30:
+        return 7
+    if 30 < a <= 70:
+        return 10
+    if 70 < a <= 95:
+        return 16
+    if 95 < a <= 100:
+        return 20
+
 
 with sq.connect("gnomes.db") as con:
     cur = con.cursor()
@@ -18,7 +36,10 @@ with sq.connect("gnomes.db") as con:
             user_id INTEGER,
             gnome_name TEXT,
             hunger_level INTEGER,
-            meat INTEGER
+            meat INTEGER,
+            tickets_to_expedition INTEGER,
+            is_dead INTEGER
+            
     )
                 """)
 
@@ -30,7 +51,7 @@ def create_gnome(user_id, gnome_name):
     with sq.connect("gnomes.db") as con:
         cursor = con.cursor()
         cursor.execute(
-            "SELECT COUNT(*) FROM users_gnomes WHERE user_id=?", (user_id,))
+            "SELECT COUNT(*) FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
         num_gnomes = cursor.fetchone()[0]
 
         if num_gnomes > 0:
@@ -38,8 +59,8 @@ def create_gnome(user_id, gnome_name):
 
         gnome = dw.Dwarf(gnome_name)
         gnome.feed(100)
-        cursor.execute("INSERT INTO users_gnomes (user_id, gnome_name, hunger_level, meat) VALUES (?, ?, ?, ?)",
-                       (user_id, gnome_name, 100, 10))
+        cursor.execute("INSERT INTO users_gnomes (user_id, gnome_name, hunger_level, meat, tickets_to_expedition, is_dead) VALUES (?, ?, ?, ?, ?, ?)",
+                       (user_id, gnome_name, 100, 10, 3, 0))
     return gnome
 
 
@@ -47,10 +68,10 @@ def get_gnome(user_id):
     with sq.connect("gnomes.db") as con:
         cursor = con.cursor()
         cursor.execute(
-            "SELECT gnome_name, hunger_level FROM users_gnomes WHERE user_id=?", (user_id,))
+            "SELECT gnome_name, hunger_level FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
         row = cursor.fetchone()
         if row:
-            gnome_name, hunger_level = row
+            gnome_name, hunger_level = row[:2]
             gnome = dw.Dwarf(gnome_name)
             gnome.feed(hunger_level)
             return gnome
@@ -84,7 +105,25 @@ def decrease_hunger_level(user_id):
             hunger = gnome.get_hunger_level()
             cursor = con.cursor()
             cursor.execute(
-                "UPDATE users_gnomes SET hunger_level=? WHERE user_id=?", (hunger, user_id))
+                "UPDATE users_gnomes SET hunger_level=? WHERE user_id=? AND is_dead!=1", (hunger, user_id))
+            if hunger == 0:
+                cursor.execute(
+                    "UPDATE users_gnomes SET is_dead=? WHERE user_id=?", (1, user_id))
+                bot.send_message(
+                    user_id, f"К сожалению, {gnome.name} не смог вынести такой голодовки и ушел в лес.")
+
+
+def increase_tickets(user_id):
+    gnome = get_gnome(user_id)
+    if gnome:
+        with sq.connect("gnomes.db") as con:
+            cursor = con.cursor()
+            cursor.execute(
+                "SELECT tickets_to_expedition FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
+            row = cursor.fetchone()
+            amount = min(3, row[0]+1)
+            cursor.execute(
+                "UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1", (amount, user_id))
 
 
 def show_meat(user_id):
@@ -122,6 +161,7 @@ def increase_hunger_level(user_id):
                     "UPDATE users_gnomes SET hunger_level=? WHERE user_id=?", (hunger, user_id))
                 cursor.execute(
                     "UPDATE users_gnomes SET meat=? WHERE user_id=?", (meat, user_id))
+                return 1
             else:
                 gnome.feed(meat*10)
                 meat = 0
@@ -130,6 +170,7 @@ def increase_hunger_level(user_id):
                     "UPDATE users_gnomes SET hunger_level=? WHERE user_id=?", (hunger, user_id))
                 cursor.execute(
                     "UPDATE users_gnomes SET meat=? WHERE user_id=?", (meat, user_id))
+                return 1
 
 
 @bot.message_handler(commands=['start'])
@@ -143,7 +184,9 @@ def start(message):
         InlineKeyboardButton("Посмотреть уровень голода",
                              callback_data="hunger_level"),
         InlineKeyboardButton("Покормить гнома", callback_data="feed_gnome"),
-        InlineKeyboardButton("Проверить запасы", callback_data="show_meat")
+        InlineKeyboardButton("Проверить запасы", callback_data="show_meat"),
+        InlineKeyboardButton("Отправится на охоту",
+                             callback_data="go_on_expedition")
     )
     bot.send_message(user_id, "Выберите действие:", reply_markup=markup)
 
@@ -168,6 +211,42 @@ def handle_callback_query(call):
     elif data == "show_meat":
         handle_show_meat(call.message, user_id)
 
+    elif data == "go_on_expedition":
+        handle_go_on_expedition(call.message, user_id)
+
+    elif data.startswith("cell_"):
+        _, row, col = data.split('_')
+        with sq.connect("gnomes.db") as con:
+            cursor = con.cursor()
+            cursor.execute(
+                "SELECT tickets_to_expedition FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
+            row = cursor.fetchone()
+            print(row)
+            if row[0] != 0:
+                output = random_meat()
+                cursor.execute("UPDATE users_gnomes SET meat=? WHERE user_id=? AND is_dead!=1",
+                               (output+show_meat(user_id), user_id))
+                cursor.execute("UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1",
+                               (row[0]-1, user_id))
+                bot.send_message(
+                    user_id, f"Вы сходили на вылазку и получили {output} кусков мяса!")
+                bot.answer_callback_query(call.id)
+            if row[0] == 0:
+                bot.send_message(
+                    user_id, f"Гном слишком устал, чтобы куда то идти!")
+
+
+def handle_go_on_expedition(message, user_id):
+    markup = InlineKeyboardMarkup()
+    for row in range(3):
+        row_buttons = []
+        for col in range(3):
+            row_buttons.append(InlineKeyboardButton(
+                "✅", callback_data=f"cell_{row}_{col}"))
+        markup.add(*row_buttons)
+    bot.send_message(
+        user_id, "Выберите клетку, чтобы получить мясо:", reply_markup=markup)
+
 
 def handle_my_gnomes(message, user_id):
     chat_show_my_gnomes(message, user_id)
@@ -176,7 +255,7 @@ def handle_my_gnomes(message, user_id):
 def handle_show_meat(message, user_id):
     amount_of_meat = show_meat(user_id)
     bot.send_message(
-        user_id, f"В ваших запасах есть {amount_of_meat} кусков мяса")
+        user_id, f"В ваших запасах есть {amount_of_meat-1} кусков мяса")
 
 
 def handle_create_gnome(message, user_id):
@@ -197,10 +276,6 @@ def create_gnome_and_notify(user_id, gnome_name):
     else:
         bot.send_message(
             user_id, "Не удалось создать гнома. Попробуйте еще раз или обратитесь за помощью.")
-
-
-def handle_hunger_level(message, user_id):
-    chat_get_hunger_level(message, user_id)
 
 
 def chat_get_hunger_level(message, user_id):
@@ -242,11 +317,12 @@ def schedule_checker():
             user_ids = cursor.fetchall()
             for user_id in user_ids:
                 decrease_hunger_level(user_id[0])
+                increase_tickets(user_id[0])
             sleep(10)
 
 
 def main():
-
+    initialize_meat_grid()
     Thread(target=schedule_checker).start()
     bot.infinity_polling()
 

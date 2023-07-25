@@ -8,9 +8,10 @@ import sqlite3 as sq
 from time import sleep
 from telebot.types import ReplyKeyboardMarkup, KeyboardButton
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import pickaxe as pic
 
 
-# Один кусок мяс восстанавливает 10 единиц голода
+# Один кусок мяса восстанавливает 10 единиц голода
 def initialize_meat_grid():
     meat_grid = [[random.randint(1, 10) for _ in range(3)] for _ in range(3)]
     return meat_grid
@@ -40,6 +41,10 @@ with sq.connect("gnomes.db") as con:
             thirst_level INTEGER,
             beer INTEGER, 
             tickets_to_expedition INTEGER,
+            gold INTEGER,
+            pickaxe_level INTEGER,
+            pickaxe_durability INTEGER,
+            pickaxe_gold_per_strike INTEGER, 
             is_dead INTEGER
             
     )
@@ -62,8 +67,21 @@ def create_gnome(user_id, gnome_name):
         gnome = dwtesting.Dwarf(gnome_name)
         gnome.feed(100)
         gnome.drink(100)
-        cursor.execute("INSERT INTO users_gnomes (user_id, gnome_name, hunger_level, meat, thirst_level, beer,  tickets_to_expedition, is_dead) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                       (user_id, gnome_name, 100, 10, 100, 10, 3, 0))
+        cursor.execute("""INSERT INTO users_gnomes (
+                       user_id, 
+                       gnome_name, 
+                       hunger_level, 
+                       meat, 
+                       thirst_level, 
+                       beer,  
+                       tickets_to_expedition,
+                       gold,
+                       pickaxe_level,
+                       pickaxe_durability,
+                       pickaxe_gold_per_strike,
+                       is_dead) 
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?)""",
+                       (user_id, gnome_name, 100, 10, 100, 10, 3, 0, 0, 0, 0, 0))
     return gnome
 
 
@@ -82,6 +100,45 @@ def get_gnome(user_id):
             return gnome
         else:
             return None
+
+
+def get_pickaxe(user_id):
+    with sq.connect("gnomes.db") as con:
+        cursor = con.cursor()
+        cursor.execute(
+            "SELECT pickaxe_level, pickaxe_durability, pickaxe_gold_per_strike FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
+        row = cursor.fetchone()
+        if row:
+            pickaxe_level, pickaxe_durability, pickaxe_gold_per_strike = row[:3]
+            tool = pic.Pickaxe(pickaxe_level)
+            return tool
+        else:
+            return None
+
+
+def pickaxe_info(user_id):
+    gnome = get_gnome(user_id)
+    pickaxe = get_pickaxe(user_id)
+    if pickaxe:
+        if pickaxe.level == 0:
+            bot.send_message(
+                user_id, f"{gnome.name} потерял свою старую кирку, попробуйте найти новую во время вылазки!")
+        elif pickaxe.level != 0 and pickaxe.durability == 0:
+            bot.send_message(
+                user_id, f"Кирка {gnome.name} превратилась в пыль от времени, попробуйте найти новую во время вылазки!")
+        else:
+            bot.send_message(
+                user_id, f"{gnome.name} является счастливым обладателем кирки {pickaxe.level}")
+
+
+def show_gold(user_id):
+    with sq.connect("gnomes.db") as con:
+        cursor = con.cursor()
+        cursor.execute(
+            "SELECT gold FROM users_gnomes WHERE user_id = ? AND is_dead!=1", (user_id, ))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
 
 
 def get_all_gnomes_names(user_id):
@@ -265,7 +322,11 @@ def start(message):
         InlineKeyboardButton("Налить гному пива", callback_data="drink_gnome"),
         InlineKeyboardButton("Проверить запасы", callback_data="show_meat"),
         InlineKeyboardButton("Отправится на охоту",
-                             callback_data="go_on_expedition")
+                             callback_data="go_on_expedition"),
+        InlineKeyboardButton("Кирка",
+                             callback_data="pickaxe_info"),
+        InlineKeyboardButton("Магазин",
+                             callback_data="shop")
     )
     markup_reply = ReplyKeyboardMarkup(resize_keyboard=True)
     reply_button = KeyboardButton("Меню")
@@ -290,7 +351,11 @@ def handle_reply(message):
         InlineKeyboardButton("Налить гному пива", callback_data="drink_gnome"),
         InlineKeyboardButton("Проверить запасы", callback_data="show_meat"),
         InlineKeyboardButton("Отправится на охоту",
-                             callback_data="go_on_expedition")
+                             callback_data="go_on_expedition"),
+        InlineKeyboardButton("Кирка",
+                             callback_data="pickaxe_info"),
+        InlineKeyboardButton("Магазин",
+                             callback_data="shop")
     )
     bot.send_message(user_id, "Основное меню:", reply_markup=markup)
 
@@ -320,7 +385,8 @@ def handle_callback_query(call):
 
     elif data == "go_on_expedition":
         handle_go_on_expedition(call.message, user_id)
-
+    elif data == "pickaxe_info":
+        pickaxe_info(user_id)
     elif data.startswith("cell_"):
         _, row, col = data.split('_')
         with sq.connect("gnomes.db") as con:
@@ -372,8 +438,11 @@ def handle_my_gnomes(message, user_id):
 def handle_show_meat(message, user_id):
     amount_of_meat = show_meat(user_id)
     amount_of_beer = show_beer(user_id)
+    amount_of_gold = show_gold(user_id)
     bot.send_message(
         user_id, f"В ваших запасах есть {amount_of_meat} кусков мяса и {amount_of_beer} кружек пива")
+    bot.send_message(
+        user_id, f" Казна содержит {amount_of_gold} единиц золота!")
 
 
 def handle_create_gnome(message, user_id):

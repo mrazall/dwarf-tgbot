@@ -1,5 +1,5 @@
 class Pickaxe:
-    def __init__(self, level=1, durability=100, gold_per_strike=1):
+    def __init__(self, level, durability=500, gold_per_strike=1):
         self.level = level
         self.durability = durability
         self.gold_per_strike = gold_per_strike
@@ -7,7 +7,7 @@ class Pickaxe:
     def mine_gold(self):
         if self.durability > 0:
             gold_obtained = self.gold_per_strike * self.level
-            self.durability -= 10  # Предполагаем, что за один удар теряется 10 единиц прочности
+            self.durability -= 3
             return gold_obtained
         else:
             return 0
@@ -17,6 +17,10 @@ class Pickaxe:
             self.level += 1
             self.gold_per_strike += 1
             self.durability = 100
+
+    def set_level(self, new_level):
+        if 1 <= new_level <= 10:
+            self.level = new_level
 
     def is_broken(self):
         return self.durability <= 0

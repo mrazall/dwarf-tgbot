@@ -1,8 +1,8 @@
 class Pickaxe:
-    def __init__(self, level, durability=500, gold_per_strike=1):
+    def __init__(self, level):
         self.level = level
-        self.durability = durability
-        self.gold_per_strike = gold_per_strike
+        self.durability = 500
+        self.gold_per_strike = level
 
     def mine_gold(self):
         if self.durability > 0:

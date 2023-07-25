@@ -1,6 +1,6 @@
 import telebot
 import schedule
-import dw
+import dwtesting
 import random
 import math
 from threading import Thread
@@ -21,9 +21,9 @@ def random_meat():
     if 1 <= a <= 10:
         return 0
     if 10 < a <= 30:
-        return random.randint(1,3)
+        return random.randint(1, 3)
     if 30 < a <= 70:
-        return random.randint(3,7)
+        return random.randint(3, 7)
     if 70 < a <= 95:
         return random.randint(6, 15)
     if 95 < a <= 100:
@@ -37,6 +37,8 @@ with sq.connect("gnomes.db") as con:
             gnome_name TEXT,
             hunger_level INTEGER,
             meat INTEGER,
+            thirst_level INTEGER,
+            beer INTEGER, 
             tickets_to_expedition INTEGER,
             is_dead INTEGER
             
@@ -57,10 +59,11 @@ def create_gnome(user_id, gnome_name):
         if num_gnomes > 0:
             return None
 
-        gnome = dw.Dwarf(gnome_name)
+        gnome = dwtesting.Dwarf(gnome_name)
         gnome.feed(100)
-        cursor.execute("INSERT INTO users_gnomes (user_id, gnome_name, hunger_level, meat, tickets_to_expedition, is_dead) VALUES (?, ?, ?, ?, ?, ?)",
-                       (user_id, gnome_name, 100, 10, 3, 0))
+        gnome.drink(100)
+        cursor.execute("INSERT INTO users_gnomes (user_id, gnome_name, hunger_level, meat, thirst_level, beer,  tickets_to_expedition, is_dead) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                       (user_id, gnome_name, 100, 10, 100, 10, 3, 0))
     return gnome
 
 
@@ -68,12 +71,14 @@ def get_gnome(user_id):
     with sq.connect("gnomes.db") as con:
         cursor = con.cursor()
         cursor.execute(
-            "SELECT gnome_name, hunger_level FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
+            "SELECT gnome_name, hunger_level, thirst_level FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
         row = cursor.fetchone()
         if row:
-            gnome_name, hunger_level = row[:2]
-            gnome = dw.Dwarf(gnome_name)
+            gnome_name, hunger_level, thirst_level = row[:3]
+            gnome = dwtesting.Dwarf(gnome_name)
             gnome.feed(hunger_level)
+            gnome.drink(thirst_level)
+
             return gnome
         else:
             return None
@@ -116,6 +121,26 @@ def decrease_hunger_level(user_id):
                     user_id, f"К сожалению, {gnome.name} не смог вынести такой голодовки и ушел в лес.")
 
 
+def decrease_thirst_level(user_id):
+    gnome = get_gnome(user_id)
+    if gnome:
+        with sq.connect("gnomes.db") as con:
+            gnome.crave(10)
+            thirst = gnome.get_thirst_level()
+
+            cursor = con.cursor()
+            cursor.execute(
+                "UPDATE users_gnomes SET thirst_level=? WHERE user_id=? AND is_dead!=1", (thirst, user_id))
+            if thirst < 30:
+                bot.send_message(
+                    user_id, f"{gnome.name} уже забывает вкус пива!")
+            elif thirst == 0:
+                cursor.execute(
+                    "UPDATE users_gnomes SET is_dead=? WHERE user_id=?", (1, user_id))
+                bot.send_message(
+                    user_id, f"К сожалению, {gnome.name} не смог вынести такой грустной жизни и ушел в лес.")
+
+
 def increase_tickets(user_id):
     gnome = get_gnome(user_id)
     if gnome:
@@ -136,13 +161,29 @@ def show_meat(user_id):
     with sq.connect("gnomes.db") as con:
         cursor = con.cursor()
         cursor.execute(
-            "SELECT meat FROM users_gnomes WHERE user_id=?", (user_id,))
+            "SELECT meat FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
+        row = cursor.fetchone()
+        return row[0]
+
+
+def show_beer(user_id):
+    with sq.connect("gnomes.db") as con:
+        cursor = con.cursor()
+        cursor.execute(
+            "SELECT beer FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
         row = cursor.fetchone()
         return row[0]
 
 
 def count_piece_of_meat_to_feed(hunger):
     if hunger >= 85:
+        return 0
+    necessity = int(math.ceil((100 - hunger)/10))
+    return necessity
+
+
+def count_beer_to_drink(hunger):
+    if hunger >= 65:
         return 0
     necessity = int(math.ceil((100 - hunger)/10))
     return necessity
@@ -179,6 +220,37 @@ def increase_hunger_level(user_id):
                 return 1
 
 
+def increase_thirst_level(user_id):
+    gnome = get_gnome(user_id)
+    if gnome:
+        with sq.connect("gnomes.db") as con:
+            thirst = gnome.get_thirst_level()
+            beer = show_beer(user_id)
+            necessity = count_beer_to_drink(thirst)
+            if beer == 0:
+                return None
+            if beer >= necessity:
+                gnome.drink(necessity*10)
+                thirst = gnome.get_thirst_level()
+
+                beer -= necessity
+                cursor = con.cursor()
+                cursor.execute(
+                    "UPDATE users_gnomes SET thirst_level=? WHERE user_id=?", (thirst, user_id))
+                cursor.execute(
+                    "UPDATE users_gnomes SET beer=? WHERE user_id=?", (beer, user_id))
+                return 1
+            else:
+                gnome.drink(beer*10)
+                beer = 0
+                cursor = con.cursor()
+                cursor.execute(
+                    "UPDATE users_gnomes SET thirst_level=? WHERE user_id=?", (thirst, user_id))
+                cursor.execute(
+                    "UPDATE users_gnomes SET beer=? WHERE user_id=?", (beer, user_id))
+                return 1
+
+
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id
@@ -187,9 +259,10 @@ def start(message):
     markup_inline.add(
         InlineKeyboardButton("Создать гнома", callback_data="create_gnome"),
         InlineKeyboardButton("Мои гномы", callback_data="my_gnomes"),
-        InlineKeyboardButton("Посмотреть уровень голода",
+        InlineKeyboardButton("Посмотреть уровень голода и жажды",
                              callback_data="hunger_level"),
         InlineKeyboardButton("Покормить гнома", callback_data="feed_gnome"),
+        InlineKeyboardButton("Налить гному пива", callback_data="drink_gnome"),
         InlineKeyboardButton("Проверить запасы", callback_data="show_meat"),
         InlineKeyboardButton("Отправится на охоту",
                              callback_data="go_on_expedition")
@@ -211,9 +284,10 @@ def handle_reply(message):
     markup.add(
         InlineKeyboardButton("Создать гнома", callback_data="create_gnome"),
         InlineKeyboardButton("Мои гномы", callback_data="my_gnomes"),
-        InlineKeyboardButton("Посмотреть уровень голода",
+        InlineKeyboardButton("Посмотреть уровень голода и жажды",
                              callback_data="hunger_level"),
         InlineKeyboardButton("Покормить гнома", callback_data="feed_gnome"),
+        InlineKeyboardButton("Налить гному пива", callback_data="drink_gnome"),
         InlineKeyboardButton("Проверить запасы", callback_data="show_meat"),
         InlineKeyboardButton("Отправится на охоту",
                              callback_data="go_on_expedition")
@@ -241,6 +315,9 @@ def handle_callback_query(call):
     elif data == "show_meat":
         handle_show_meat(call.message, user_id)
 
+    elif data == "drink_gnome":
+        handle_drink_gnome(call.message, user_id)
+
     elif data == "go_on_expedition":
         handle_go_on_expedition(call.message, user_id)
 
@@ -251,16 +328,26 @@ def handle_callback_query(call):
             cursor.execute(
                 "SELECT tickets_to_expedition FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
             row = cursor.fetchone()
-            print(row)
+
             if row[0] != 0:
                 output = random_meat()
-                cursor.execute("UPDATE users_gnomes SET meat=? WHERE user_id=? AND is_dead!=1",
-                               (output+show_meat(user_id), user_id))
-                cursor.execute("UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1",
-                               (row[0]-1, user_id))
-                bot.send_message(
-                    user_id, f"Вы сходили на вылазку и получили {output} кусков мяса!")
-                bot.answer_callback_query(call.id)
+                a = random.randint(1, 100)
+                if a >= 50:
+                    cursor.execute("UPDATE users_gnomes SET meat=? WHERE user_id=? AND is_dead!=1",
+                                   (output+show_meat(user_id), user_id))
+                    cursor.execute("UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1",
+                                   (row[0]-1, user_id))
+                    bot.send_message(
+                        user_id, f"Вы сходили на вылазку и получили {output} кусков мяса!")
+                    bot.answer_callback_query(call.id)
+                else:
+                    cursor.execute("UPDATE users_gnomes SET beer=? WHERE user_id=? AND is_dead!=1",
+                                   (output+show_beer(user_id), user_id))
+                    cursor.execute("UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1",
+                                   (row[0]-1, user_id))
+                    bot.send_message(
+                        user_id, f"Вы сходили на вылазку и нашли {output} кружек пива!")
+                    bot.answer_callback_query(call.id)
             if row[0] == 0:
                 bot.send_message(
                     user_id, f"Гном слишком устал, чтобы куда то идти!")
@@ -275,7 +362,7 @@ def handle_go_on_expedition(message, user_id):
                 "✅", callback_data=f"cell_{row}_{col}"))
         markup.add(*row_buttons)
     bot.send_message(
-        user_id, "Выберите клетку, чтобы получить мясо:", reply_markup=markup)
+        user_id, "Выберите клетку для изучения:", reply_markup=markup)
 
 
 def handle_my_gnomes(message, user_id):
@@ -284,8 +371,9 @@ def handle_my_gnomes(message, user_id):
 
 def handle_show_meat(message, user_id):
     amount_of_meat = show_meat(user_id)
+    amount_of_beer = show_beer(user_id)
     bot.send_message(
-        user_id, f"В ваших запасах есть {amount_of_meat-1} кусков мяса")
+        user_id, f"В ваших запасах есть {amount_of_meat} кусков мяса и {amount_of_beer} кружек пива")
 
 
 def handle_create_gnome(message, user_id):
@@ -313,8 +401,11 @@ def chat_get_hunger_level(message, user_id):
     gnome = get_gnome(user_id)
     if gnome:
         hunger = gnome.get_hunger_level()
-        bot.reply_to(message, f"Ваш гном {dw.level_of_hunger(hunger)}")
-        print(hunger)
+        thirst = gnome.get_thirst_level()
+
+        bot.reply_to(
+            message, f"Ваш гном {dwtesting.level_of_hunger(hunger)} и {dwtesting.level_of_thirst(thirst)}")
+
     else:
         bot.reply_to(
             message, "У вас еще нет гнома. Используйте команду /start, чтобы создать его.")
@@ -327,13 +418,32 @@ def handle_feed_gnome(message, user_id):
             gnome = get_gnome(user_id)
             if show_meat(user_id) != 0:
                 bot.reply_to(
-                    message, f"Вы покормили {gnome.name}! Теперь он {dw.level_of_hunger(gnome.get_hunger_level())}")
+                    message, f"Вы покормили {gnome.name}! Теперь он {dwtesting.level_of_hunger(gnome.get_hunger_level())}")
             else:
                 bot.reply_to(
-                    message, f"Вы покормили {gnome.name}! Теперь он {dw.level_of_hunger(gnome.get_hunger_level())}. Запасы мяса иссякли!")
+                    message, f"Вы покормили {gnome.name}! Теперь он {dwtesting.level_of_hunger(gnome.get_hunger_level())}. Запасы мяса иссякли!")
         else:
             bot.reply_to(
                 message, f"Запасы мяса иссякли - скорее отправляйтесь на охоту!")
+    else:
+        bot.reply_to(
+            message, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
+
+
+def handle_drink_gnome(message, user_id):
+    gnome = get_gnome(user_id)
+    if gnome:
+        if increase_thirst_level(user_id):
+            gnome = get_gnome(user_id)
+            if show_beer(user_id) != 0:
+                bot.reply_to(
+                    message, f"Вы угостили {gnome.name} пивом! Теперь он {dwtesting.level_of_thirst(gnome.get_thirst_level())}")
+            else:
+                bot.reply_to(
+                    message, f"Вы угостили {gnome.name} пивом! Теперь он {dwtesting.level_of_thirst(gnome.get_thirst_level())}. Запасы пива иссякли!")
+        else:
+            bot.reply_to(
+                message, f"Запасы пива иссякли - скорее отправляйтесь на поиски!")
     else:
         bot.reply_to(
             message, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
@@ -347,7 +457,18 @@ def schedule_checker_hunger():
             user_ids = cursor.fetchall()
             for user_id in user_ids:
                 decrease_hunger_level(user_id[0])
-            sleep(600)
+            sleep(500)
+
+
+def schedule_checker_thirst():
+    while True:
+        with sq.connect("gnomes.db") as con:
+            cursor = con.cursor()
+            cursor.execute("SELECT user_id FROM users_gnomes")
+            user_ids = cursor.fetchall()
+            for user_id in user_ids:
+                decrease_thirst_level(user_id[0])
+            sleep(700)
 
 
 def schedule_checker_tickets():
@@ -358,12 +479,13 @@ def schedule_checker_tickets():
             user_ids = cursor.fetchall()
             for user_id in user_ids:
                 increase_tickets(user_id[0])
-            sleep(300)
+            sleep(700)
 
 
 def main():
     initialize_meat_grid()
     Thread(target=schedule_checker_hunger).start()
+    Thread(target=schedule_checker_thirst).start()
     Thread(target=schedule_checker_tickets).start()
     bot.infinity_polling()
 

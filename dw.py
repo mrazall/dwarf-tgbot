@@ -5,6 +5,7 @@ class Dwarf:
     def __init__(self, name):
         self.name = name
         self.hunger_level = 0
+        self.thirst_level = 0
 
     def feed(self, amount):
         self.hunger_level = min(self.hunger_level + amount, 100)
@@ -14,6 +15,16 @@ class Dwarf:
 
     def get_hunger_level(self):
         return self.hunger_level
+
+    def drink(self, amount):
+        self.thirst_level = min(self.thirst_level + amount, 100)
+
+    def crave(self, amount):
+        self.thirst_level = max(self.thirst_level - amount, 0)
+
+    def get_thirst_level(self):
+        return self.thirst_level
+
 
 
 def level_of_hunger(level):
@@ -27,3 +38,12 @@ def level_of_hunger(level):
         return ("умеренно голоден")
     if 85 < level <= 100:
         return ("сыт")
+
+
+def level_of_thirst(level):
+    if 0 <= level <= 30:
+        return ("умирает от жажды")
+    if 30 < level <= 65:
+        return ("думает о кружке")
+    if 65 < level <= 100:
+        return ("весел и пьян")

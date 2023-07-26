@@ -280,7 +280,7 @@ def buy_pickaxe_upgrade(user_id):
                 if amount_of_gold >= 100:
                     amount_of_gold -= 100
                     pickaxe_level += 1
-                    tool = pic.Pickaxe(pickaxe_level)
+                    tool = pic.Pickaxe(pickaxe_level, 500)
                     tool.durability
 
                     cursor.execute("""UPDATE users_gnomes 
@@ -538,7 +538,7 @@ def handle_callback_query(call):
                                 call.id, text=f"К сожалению вы ничего не нашли.")
                     else:
                         level = random_pickaxe()
-                        tool = pic.Pickaxe(level)
+                        tool = pic.Pickaxe(level, 500)
                         cursor.execute(
                             "SELECT pickaxe_level FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
                         current_pickaxe_level = cursor.fetchone()[0]

@@ -1,0 +1,4 @@
+__pycache__/*
+.vscode/*
+gnomes.db
+1.py

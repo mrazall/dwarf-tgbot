@@ -296,18 +296,21 @@ def buy_pickaxe_upgrade(user_id):
                 if amount_of_gold >= 100:
                     amount_of_gold -= 100
                     pickaxe_level += 1
-                    tool = pic.Pickaxe(pickaxe_level, 500)
-                    tool.durability
+                    if pickaxe_level<11:
+                        tool = pic.Pickaxe(pickaxe_level, 500)
+                        tool.durability
 
-                    cursor.execute("""UPDATE users_gnomes 
-                                SET gold=?, 
-                                pickaxe_level=?, 
-                                pickaxe_durability=?
-                                WHERE user_id=? AND is_dead!=1""", (
-                        amount_of_gold, tool.level, tool.durability, user_id,))
-                    return True
+                        cursor.execute("""UPDATE users_gnomes 
+                                    SET gold=?, 
+                                    pickaxe_level=?, 
+                                    pickaxe_durability=?
+                                    WHERE user_id=? AND is_dead!=1""", (
+                            amount_of_gold, tool.level, tool.durability, user_id,))
+                        return 1
+                    else:
+                        return -1
                 else:
-                    return False
+                    return 0
 
 
 def mine_gold_task(user_id):
@@ -626,13 +629,16 @@ def handle_callback_query(call):
                 call.id, text="К сожалению, у вас не хватает средств.")
 
     elif data == "upgrade_pickaxe_in_shop":
-        if buy_pickaxe_upgrade(user_id):
+        res = buy_pickaxe_upgrade(user_id)
+        if res == 1:
             bot.answer_callback_query(
                 call.id, text="Вы улучшили свою ⛏ до следующего уровня!")
-        else:
+        elif res == 0:
             bot.answer_callback_query(
                 call.id, text="К сожалению, у вас не хватает средств.")
-
+        elif res == -1:
+            bot.answer_callback_query(
+                call.id, text="Ваша кирка уже максимального уровня!")
 
 def handle_go_on_expedition(message, user_id):
     gnome = get_gnome(user_id)
@@ -735,7 +741,7 @@ def pickaxe_info(message, user_id):
                 user_id, f"Кирка {tw.inflect_to_dative(gnome.name)} превратилась в пыль от времени, попробуйте найти новую во время вылазки!")
         else:
             bot.send_message(
-                user_id, f"{gnome.name} является {tw.detect_gender(gnome.name, 'счастливым', 'счатливой')} {tw.detect_gender(gnome.name, 'обладателем', 'обладательницей')} кирки {pickaxe.level} уровня. Прочность кирки составляет {pickaxe.durability/5}%.")
+                user_id, f"{gnome.name} является {tw.detect_gender(gnome.name, 'счастливым', 'счатливой')} {tw.detect_gender(gnome.name, 'обладателем', 'обладательницей')} кирки {pickaxe.level} уровня. Прочность кирки составляет {pickaxe.durability//5}%.")
     else:
         bot.reply_to(
             message, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")

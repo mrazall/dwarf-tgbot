@@ -1,5 +1,4 @@
 import telebot
-import schedule
 import dwtesting
 import random
 import math

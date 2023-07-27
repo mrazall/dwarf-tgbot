@@ -1,6 +1,5 @@
 import telebot
 import random
-import schedule
 import dw
 import random
 import math
@@ -14,6 +13,8 @@ from datetime import time, date, datetime
 import text_work as tw
 
 # Один кусок мяса восстанавливает 10 единиц голода
+
+
 def initialize_meat_grid():
     meat_grid = [[random.randint(1, 10) for _ in range(3)] for _ in range(3)]
     return meat_grid
@@ -55,7 +56,6 @@ with sq.connect("gnomes.db") as con:
             
     )
                 """)
-
 
 
 bot = telebot.TeleBot("6370080307:AAEm_cm-4O06Ond8OzUA0ht4Koo3OOljsZY")
@@ -167,7 +167,10 @@ def chat_show_my_gnomes(message, user_id):
             if row[-1]:
                 response += f"{row[0]} прожил с вами {date_difference.days}.\n"
             else:
-                response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: "+"🍖"*dw.level_of_hunger(row[2])+"\nУровень жажды: " + "🍺"*dw.level_of_thirst(row[3])
+                response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
+                    "🍖" * \
+                    dw.level_of_hunger(
+                        row[2])+"\nУровень жажды: " + "🍺"*dw.level_of_thirst(row[3])
     else:
         response = "У вас еще нет гномов. Используйте команду /start, чтобы создать своего первого гнома."
     bot.reply_to(message, response)
@@ -502,11 +505,11 @@ def handle_callback_query(call):
         markup.row_width = 1
         markup.add(
             InlineKeyboardButton(
-                "Купить кусок мяса (5)", callback_data="buy_meat_in_shop"),
+                "Купить 🍖 (5💰)", callback_data="buy_meat_in_shop"),
             InlineKeyboardButton(
-                "Купить кружку пива (5)", callback_data="buy_beer_in_shop"),
+                "Купить 🍺 (5💰)", callback_data="buy_beer_in_shop"),
             InlineKeyboardButton(
-                "Улучшить ⛏кирку⛏ (100)", callback_data="upgrade_pickaxe_in_shop"),
+                "Улучшить кирку (100💰)", callback_data="upgrade_pickaxe_in_shop"),
         )
         bot.send_message(
             user_id, f"Добро пожаловать в магазин! Что бы вы хотели?", reply_markup=markup)
@@ -679,7 +682,8 @@ def handle_create_gnome(message, user_id):
 def create_gnome_and_notify(user_id, gnome_name):
     gnome = create_gnome(user_id, gnome_name)
     if gnome:
-        bot.send_message(user_id, f"{gnome_name} {tw.detect_gender(gnome.name, 'выбрался', 'выбралась')} из темной пещеры!")
+        bot.send_message(
+            user_id, f"{gnome_name} {tw.detect_gender(gnome.name, 'выбрался', 'выбралась')} из темной пещеры!")
     else:
         bot.send_message(
             user_id, "Не удалось создать гнома. Попробуйте еще раз или обратитесь за помощью.")
@@ -744,10 +748,10 @@ def handle_drink_gnome(message, user_id):
             gnome = get_gnome(user_id)
             if show_beer(user_id) != 0:
                 bot.reply_to(
-                    message, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: "+ "🍺"*dw.level_of_thirst(gnome.get_thirst_level()))
+                    message, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level()))
             else:
                 bot.reply_to(
-                    message, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: "+ "🍺"*dw.level_of_thirst(gnome.get_thirst_level())+"\nЗапасы пива иссякли!")
+                    message, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level())+"\nЗапасы пива иссякли!")
         else:
             bot.reply_to(
                 message, f"Запасы пива иссякли - скорее отправляйтесь на поиски!")

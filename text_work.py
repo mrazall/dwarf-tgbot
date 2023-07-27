@@ -1,5 +1,4 @@
 import subprocess
-
 def inflect_to_accusative(name):
     ruby_script = '''
     require 'petrovich'

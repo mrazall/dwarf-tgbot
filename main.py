@@ -769,7 +769,7 @@ def handle_drink_gnome(message, user_id):
 def schedule_checker_hunger():
     while True:
         with sq.connect("gnomes.db") as con:
-            sleep(1000)
+            sleep(4000)
             cursor = con.cursor()
             cursor.execute("SELECT user_id FROM users_gnomes")
             user_ids = cursor.fetchall()
@@ -780,7 +780,7 @@ def schedule_checker_hunger():
 def schedule_checker_thirst():
     while True:
         with sq.connect("gnomes.db") as con:
-            sleep(1500)
+            sleep(4500)
             cursor = con.cursor()
             cursor.execute("SELECT user_id FROM users_gnomes WHERE is_dead!=1")
             user_ids = cursor.fetchall()

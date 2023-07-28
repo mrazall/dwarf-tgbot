@@ -1,7 +1,7 @@
 import telebot
 import random
 import dw
-import random
+import get_random as gr
 import math
 from threading import Thread
 import sqlite3 as sq
@@ -18,20 +18,6 @@ import text_work as tw
 def initialize_meat_grid():
     meat_grid = [[random.randint(1, 10) for _ in range(3)] for _ in range(3)]
     return meat_grid
-
-
-def random_meat():
-    a = random.randint(1, 100)
-    if 1 <= a <= 10:
-        return 0
-    if 10 < a <= 30:
-        return random.randint(1, 3)
-    if 30 < a <= 70:
-        return random.randint(3, 7)
-    if 70 < a <= 95:
-        return random.randint(6, 15)
-    if 95 < a <= 100:
-        return random.randint(15, 20)
 
 
 with sq.connect("gnomes.db") as con:
@@ -58,7 +44,7 @@ with sq.connect("gnomes.db") as con:
                 """)
 
 
-bot = telebot.TeleBot("6370080307:AAEm_cm-4O06Ond8OzUA0ht4Koo3OOljsZY")
+bot = telebot.TeleBot("6449445883:AAHhOqIfbNy_nQT1r2Xqu-t_6SXaChekzao")
 
 
 def create_gnome(user_id, gnome_name):
@@ -97,9 +83,7 @@ def create_gnome(user_id, gnome_name):
     return gnome
 
 
-def random_pickaxe():
-    a = random.randint(1000, 10300)
-    return (a//1000)
+
 
 
 def repair_pickaxe(level):
@@ -167,10 +151,17 @@ def chat_show_my_gnomes(message, user_id):
             if row[-1]:
                 response += f"{row[0]} прожил с вами {date_difference.days}.\n"
             else:
-                response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
-                    "🍖" * \
-                    dw.level_of_hunger(
-                        row[2])+"\nУровень жажды: " + "🍺"*dw.level_of_thirst(row[3])
+                amount_of_tickets = show_tickets(user_id)
+                if amount_of_tickets!=0:
+                    response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
+                        "🍖" * \
+                        dw.level_of_hunger(
+                            row[2])+"\nУровень жажды: " + "🍺"*dw.level_of_thirst(row[3]) + '\nУровень сил:'+show_tickets(user_id)*"⚡️"
+                else:
+                    response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
+                        "🍖" * \
+                        dw.level_of_hunger(
+                            row[2])+"\nУровень жажды: " + "🍺"*dw.level_of_thirst(row[3]) + f"\nУровень сил: {tw.inflect_to_dative(row[0])} нужно время чтобы отдохнуть"
     else:
         response = "У вас еще нет гномов. Используйте команду /start, чтобы создать своего первого гнома."
     bot.reply_to(message, response)
@@ -246,6 +237,7 @@ def increase_shop(user_id):
 def buy_meat(user_id):
     gnome = get_gnome(user_id)
     if gnome:
+        cost = 20
         with sq.connect("gnomes.db") as con:
             cursor = con.cursor()
             cursor.execute(
@@ -253,8 +245,8 @@ def buy_meat(user_id):
             row = cursor.fetchone()
             if row:
                 amount_of_gold, amount_of_meat = row
-                if amount_of_gold >= 5:
-                    amount_of_gold -= 5
+                if amount_of_gold >= cost:
+                    amount_of_gold -= cost
                     amount_of_meat += 1
                     cursor.execute("UPDATE users_gnomes SET gold=?, meat=? WHERE user_id=? AND is_dead!=1", (
                         amount_of_gold, amount_of_meat, user_id,))
@@ -266,6 +258,7 @@ def buy_meat(user_id):
 def buy_beer(user_id):
     gnome = get_gnome(user_id)
     if gnome:
+        cost = 20
         with sq.connect("gnomes.db") as con:
             cursor = con.cursor()
             cursor.execute(
@@ -273,8 +266,8 @@ def buy_beer(user_id):
             row = cursor.fetchone()
             if row:
                 amount_of_gold, amount_of_beer = row
-                if amount_of_gold >= 5:
-                    amount_of_gold -= 5
+                if amount_of_gold >= cost:
+                    amount_of_gold -= cost
                     amount_of_beer += 1
                     cursor.execute("UPDATE users_gnomes SET gold=?, beer=? WHERE user_id=? AND is_dead!=1", (
                         amount_of_gold, amount_of_beer, user_id,))
@@ -286,6 +279,7 @@ def buy_beer(user_id):
 def buy_pickaxe_upgrade(user_id):
     gnome = get_gnome(user_id)
     if gnome:
+        cost = 799
         with sq.connect("gnomes.db") as con:
             cursor = con.cursor()
             cursor.execute(
@@ -293,8 +287,8 @@ def buy_pickaxe_upgrade(user_id):
             row = cursor.fetchone()
             if row:
                 amount_of_gold, pickaxe_level = row
-                if amount_of_gold >= 100:
-                    amount_of_gold -= 100
+                if amount_of_gold >= cost:
+                    amount_of_gold -= cost
                     pickaxe_level += 1
                     if pickaxe_level<11:
                         tool = pic.Pickaxe(pickaxe_level, 500)
@@ -349,6 +343,13 @@ def show_beer(user_id):
         row = cursor.fetchone()
         return row[0]
 
+def show_tickets(user_id):
+    with sq.connect("gnomes.db") as con:
+        cursor = con.cursor()
+        cursor.execute(
+            "SELECT tickets_to_expedition FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
+        row = cursor.fetchone()
+        return row[0]
 
 def count_piece_of_meat_to_feed(hunger):
     if hunger >= 85:
@@ -508,11 +509,11 @@ def handle_callback_query(call):
         markup.row_width = 1
         markup.add(
             InlineKeyboardButton(
-                "Купить 🍖 (5💰)", callback_data="buy_meat_in_shop"),
+                "Купить 🍖 (20💰)", callback_data="buy_meat_in_shop"),
             InlineKeyboardButton(
-                "Купить 🍺 (5💰)", callback_data="buy_beer_in_shop"),
+                "Купить 🍺 (20💰)", callback_data="buy_beer_in_shop"),
             InlineKeyboardButton(
-                "Улучшить кирку (100💰)", callback_data="upgrade_pickaxe_in_shop"),
+                "Улучшить кирку (799💰)", callback_data="upgrade_pickaxe_in_shop"),
         )
         bot.send_message(
             user_id, f"Добро пожаловать в магазин! Что бы вы хотели?", reply_markup=markup)
@@ -528,7 +529,7 @@ def handle_callback_query(call):
                 if row[0] != 0:
                     a = random.randint(1, 125)
                     if a >= 58 and a <= 116:
-                        output = random_meat()
+                        output = gr.random_output()
                         cursor.execute("UPDATE users_gnomes SET meat=? WHERE user_id=? AND is_dead!=1",
                                        (output+show_meat(user_id), user_id))
                         cursor.execute("UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1",
@@ -540,7 +541,7 @@ def handle_callback_query(call):
                             bot.answer_callback_query(
                                 call.id, text=f"К сожалению вы ничего не нашли.")
                     elif a < 58:
-                        output = random_meat()
+                        output = gr.random_output()
                         cursor.execute("UPDATE users_gnomes SET beer=? WHERE user_id=? AND is_dead!=1",
                                        (output+show_beer(user_id), user_id))
                         cursor.execute("UPDATE users_gnomes SET tickets_to_expedition=? WHERE user_id=? AND is_dead!=1",
@@ -552,7 +553,7 @@ def handle_callback_query(call):
                             bot.answer_callback_query(
                                 call.id, text=f"К сожалению вы ничего не нашли.")
                     else:
-                        level = random_pickaxe()
+                        level = gr.random_pickaxe()
                         tool = pic.Pickaxe(level, 500)
                         cursor.execute(
                             "SELECT pickaxe_level FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
@@ -604,8 +605,8 @@ def handle_callback_query(call):
                 "SELECT new_pickaxe_level FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
             new_pickaxe_level = cursor.fetchone()[0]
             cursor.execute("""UPDATE users_gnomes SET 
-                           pickaxe_level=? WHERE user_id = ? and is_dead!=1""",
-                           (new_pickaxe_level, user_id,))
+                           pickaxe_level=?, pickaxe_durability=? WHERE user_id = ? and is_dead!=1""",
+                           (new_pickaxe_level, 500 ,user_id,))
             bot.answer_callback_query(
                 call.id, text=f"⛏Кирка⛏ успешно обновлена до {new_pickaxe_level} уровня!")
 
@@ -714,19 +715,18 @@ def handle_feed_gnome(message, user_id):
     gnome = get_gnome(user_id)
     if gnome:
         if increase_hunger_level(user_id):
-            gnome = get_gnome(user_id)
             if show_meat(user_id) != 0:
-                bot.reply_to(
-                    message, f"Вы покормили {tw.inflect_to_accusative(gnome.name)}!\nУровень насыщенения: " + dw.level_of_hunger(gnome.get_hunger_level())*"🍖")
+                bot.send_message(
+                    user_id, f"Вы покормили {tw.inflect_to_accusative(gnome.name)}!\nУровень насыщенения: " + dw.level_of_hunger(gnome.get_hunger_level())*"🍖")
             else:
-                bot.reply_to(
-                    message, f"Вы покормили {tw.inflect_to_accusative(gnome.name) }!\nУровень насыщенения: " + dw.level_of_hunger(gnome.get_hunger_level())*"🍖"+"\nЗапасы мяса иссякли!")
+                bot.send_message(
+                    user_id, f"Вы покормили {tw.inflect_to_accusative(gnome.name) }!\nУровень насыщенения: " + dw.level_of_hunger(gnome.get_hunger_level())*"🍖"+"\nЗапасы мяса иссякли!")
         else:
-            bot.reply_to(
-                message, f"Запасы мяса иссякли - скорее отправляйтесь на вылазку!")
+            bot.send_message(
+                user_id, f"Запасы мяса иссякли - скорее отправляйтесь на вылазку!")
     else:
-        bot.reply_to(
-            message, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
+        bot.send_message(
+            user_id, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
 
 
 def pickaxe_info(message, user_id):
@@ -753,17 +753,17 @@ def handle_drink_gnome(message, user_id):
         if increase_thirst_level(user_id):
             gnome = get_gnome(user_id)
             if show_beer(user_id) != 0:
-                bot.reply_to(
-                    message, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level()))
+                bot.send_message(
+                    user_id, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level()))
             else:
-                bot.reply_to(
-                    message, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level())+"\nЗапасы пива иссякли!")
+                bot.send_message(
+                    user_id, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level())+"\nЗапасы пива иссякли!")
         else:
-            bot.reply_to(
-                message, f"Запасы пива иссякли - скорее отправляйтесь на поиски!")
+            bot.send_message(
+                user_id, f"Запасы пива иссякли - скорее отправляйтесь на поиски!")
     else:
-        bot.reply_to(
-            message, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
+        bot.send_message(
+            user_id, "У вас еще нет гнома. Используйте команду /start, чтобы создать своего первого гнома.")
 
 
 def schedule_checker_hunger():

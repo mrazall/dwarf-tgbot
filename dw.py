@@ -1,3 +1,5 @@
+import sqlite3 as sq
+from datetime import time, date, datetime
 
 
 class Dwarf:
@@ -46,8 +48,5 @@ def level_of_thirst(level):
         return 2
     if 65 < level <= 100:
         return 3
-
-
-
 
 

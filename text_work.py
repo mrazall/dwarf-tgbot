@@ -38,7 +38,7 @@ def inflect_to_dative(name):
     end
 
     input_name = $stdin.gets.chomp
-    accusative_name = inflect_to_accusative(input_name)
+    accusative_name = inflect_to_dative(input_name)
     puts accusative_name
     '''
 

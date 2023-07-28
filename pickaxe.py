@@ -1,3 +1,5 @@
+
+
 class Pickaxe:
     def __init__(self, level, durability):
         self.level = level
@@ -24,3 +26,5 @@ class Pickaxe:
 
     def is_broken(self):
         return self.durability <= 0
+
+

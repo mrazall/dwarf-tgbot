@@ -240,15 +240,16 @@ def buy_meat(user_id):
         with sq.connect("gnomes.db") as con:
             cursor = con.cursor()
             cursor.execute(
-                "SELECT gold, meat FROM users_gnomes WHERE user_id = ? AND is_dead!=1", (user_id,))
+                "SELECT gold, meat, shop_meat FROM users_gnomes WHERE user_id = ? AND is_dead!=1", (user_id,))
             row = cursor.fetchone()
             if row:
-                amount_of_gold, amount_of_meat = row
+                amount_of_gold, amount_of_meat, shop = row
                 if amount_of_gold >= cost:
                     amount_of_gold -= cost
                     amount_of_meat += 1
-                    cursor.execute("UPDATE users_gnomes SET gold=?, meat=? WHERE user_id=? AND is_dead!=1", (
-                        amount_of_gold, amount_of_meat, user_id,))
+                    shop-=1
+                    cursor.execute("UPDATE users_gnomes SET gold=?, meat=?,shop_meat = ?  WHERE user_id=? AND is_dead!=1", (
+                        amount_of_gold, amount_of_meat,shop ,user_id,))
                     return True
                 else:
                     return False
@@ -261,15 +262,16 @@ def buy_beer(user_id):
         with sq.connect("gnomes.db") as con:
             cursor = con.cursor()
             cursor.execute(
-                "SELECT gold, beer FROM users_gnomes WHERE user_id = ? AND is_dead!=1", (user_id,))
+                "SELECT gold, beer, shop_beer FROM users_gnomes WHERE user_id = ? AND is_dead!=1", (user_id,))
             row = cursor.fetchone()
             if row:
-                amount_of_gold, amount_of_beer = row
+                amount_of_gold, amount_of_beer, shop = row
                 if amount_of_gold >= cost:
                     amount_of_gold -= cost
                     amount_of_beer += 1
+                    shop -=1
                     cursor.execute("UPDATE users_gnomes SET gold=?, beer=? WHERE user_id=? AND is_dead!=1", (
-                        amount_of_gold, amount_of_beer, user_id,))
+                        amount_of_gold, amount_of_beer, shop, user_id,))
                     return True
                 else:
                     return False

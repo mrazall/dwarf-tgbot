@@ -78,12 +78,9 @@ def create_gnome(user_id, gnome_name):
                        birth_date,
                        is_dead) 
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?,?,?,?,?,?,?)""",
-                       (user_id, gnome_name, 100, 10, 100, 10, 3, 0, 0, 0, 0, 0, 5, 5, current_date, 0))
+                       (user_id, gnome_name, 50, 10, 50, 10, 3, 0, 0, 0, 0, 0, 5, 5, current_date, 0))
 
     return gnome
-
-
-
 
 
 def repair_pickaxe(level):
@@ -152,16 +149,18 @@ def chat_show_my_gnomes(message, user_id):
                 response += f"{row[0]} прожил с вами {date_difference.days}.\n"
             else:
                 amount_of_tickets = show_tickets(user_id)
-                if amount_of_tickets!=0:
+                if amount_of_tickets != 0:
                     response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
-                        "🍖" * \
+                        "🟩" * \
                         dw.level_of_hunger(
-                            row[2])+"\nУровень жажды: " + "🍺"*dw.level_of_thirst(row[3]) + '\nУровень сил:'+show_tickets(user_id)*"⚡️"
+                            row[2]) + (5 - dw.level_of_hunger(
+                                row[2]))*"⬜️"+"\nУровень жажды: " + "🟩"*dw.level_of_thirst(row[3]) + "⬜️"*(3-dw.level_of_thirst(row[3])) + '\nУровень сил:'+show_tickets(user_id)*"🔋" + (3-show_tickets(user_id))*"🪫"
                 else:
                     response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
-                        "🍖" * \
+                        "🟩" * \
                         dw.level_of_hunger(
-                            row[2])+"\nУровень жажды: " + "🍺"*dw.level_of_thirst(row[3]) + f"\nУровень сил: {tw.inflect_to_dative(row[0])} нужно время чтобы отдохнуть"
+                            row[2]) + (5 - dw.level_of_hunger(
+                                row[2]))*"⬜️"+"\nУровень жажды: " + "🟩"*dw.level_of_thirst(row[3]) + "⬜️"*(3-dw.level_of_thirst(row[3])) + f"\nУровень сил: {tw.inflect_to_dative(row[0])} нужно время чтобы отдохнуть"
     else:
         response = "У вас еще нет гномов. Используйте команду /start, чтобы создать своего первого гнома."
     bot.reply_to(message, response)
@@ -290,7 +289,7 @@ def buy_pickaxe_upgrade(user_id):
                 if amount_of_gold >= cost:
                     amount_of_gold -= cost
                     pickaxe_level += 1
-                    if pickaxe_level<11:
+                    if pickaxe_level < 11:
                         tool = pic.Pickaxe(pickaxe_level, 500)
                         tool.durability
 
@@ -343,6 +342,7 @@ def show_beer(user_id):
         row = cursor.fetchone()
         return row[0]
 
+
 def show_tickets(user_id):
     with sq.connect("gnomes.db") as con:
         cursor = con.cursor()
@@ -350,6 +350,7 @@ def show_tickets(user_id):
             "SELECT tickets_to_expedition FROM users_gnomes WHERE user_id=? AND is_dead!=1", (user_id,))
         row = cursor.fetchone()
         return row[0]
+
 
 def count_piece_of_meat_to_feed(hunger):
     if hunger >= 85:
@@ -486,23 +487,30 @@ def handle_callback_query(call):
 
     elif data == "my_gnomes":
         chat_show_my_gnomes(call.message, user_id)
+        bot.answer_callback_query(call.id)
 
     elif data == "hunger_level":
         chat_get_hunger_level(call.message, user_id)
+        bot.answer_callback_query(call.id)
 
     elif data == "feed_gnome":
         handle_feed_gnome(call.message, user_id)
+        bot.answer_callback_query(call.id)
 
     elif data == "show_meat":
         handle_show_meat(call.message, user_id)
+        bot.answer_callback_query(call.id)
 
     elif data == "drink_gnome":
         handle_drink_gnome(call.message, user_id)
+        bot.answer_callback_query(call.id)
 
     elif data == "go_on_expedition":
         handle_go_on_expedition(call.message, user_id)
+        bot.answer_callback_query(call.id)
     elif data == "pickaxe_info":
         pickaxe_info(call.message, user_id)
+        bot.answer_callback_query(call.id)
 
     elif data == "shop":
         markup = InlineKeyboardMarkup()
@@ -517,6 +525,7 @@ def handle_callback_query(call):
         )
         bot.send_message(
             user_id, f"Добро пожаловать в магазин! Что бы вы хотели?", reply_markup=markup)
+        bot.answer_callback_query(call.id)
     elif data.startswith("cell_"):
         gnome = get_gnome(user_id)
         if gnome:
@@ -606,7 +615,7 @@ def handle_callback_query(call):
             new_pickaxe_level = cursor.fetchone()[0]
             cursor.execute("""UPDATE users_gnomes SET 
                            pickaxe_level=?, pickaxe_durability=? WHERE user_id = ? and is_dead!=1""",
-                           (new_pickaxe_level, 500 ,user_id,))
+                           (new_pickaxe_level, 500, user_id,))
             bot.answer_callback_query(
                 call.id, text=f"⛏Кирка⛏ успешно обновлена до {new_pickaxe_level} уровня!")
 
@@ -640,6 +649,7 @@ def handle_callback_query(call):
         elif res == -1:
             bot.answer_callback_query(
                 call.id, text="Ваша кирка уже максимального уровня!")
+
 
 def handle_go_on_expedition(message, user_id):
     gnome = get_gnome(user_id)
@@ -716,11 +726,12 @@ def handle_feed_gnome(message, user_id):
     if gnome:
         if increase_hunger_level(user_id):
             if show_meat(user_id) != 0:
+                amount = dw.level_of_hunger(gnome.get_hunger_level())
                 bot.send_message(
-                    user_id, f"Вы покормили {tw.inflect_to_accusative(gnome.name)}!\nУровень насыщенения: " + dw.level_of_hunger(gnome.get_hunger_level())*"🍖")
+                    user_id, f"Вы покормили {tw.inflect_to_accusative(gnome.name)}!\nУровень насыщенения: " + amount*"🟩" + (5-amount)*"⬜️")
             else:
                 bot.send_message(
-                    user_id, f"Вы покормили {tw.inflect_to_accusative(gnome.name) }!\nУровень насыщенения: " + dw.level_of_hunger(gnome.get_hunger_level())*"🍖"+"\nЗапасы мяса иссякли!")
+                    user_id, f"Вы покормили {tw.inflect_to_accusative(gnome.name) }!\nУровень насыщенения: " + dw.level_of_hunger(gnome.get_hunger_level())*"🟩"+"\nЗапасы мяса иссякли!")
         else:
             bot.send_message(
                 user_id, f"Запасы мяса иссякли - скорее отправляйтесь на вылазку!")
@@ -753,11 +764,12 @@ def handle_drink_gnome(message, user_id):
         if increase_thirst_level(user_id):
             gnome = get_gnome(user_id)
             if show_beer(user_id) != 0:
+                amount = dw.level_of_thirst(gnome.get_thirst_level())
                 bot.send_message(
-                    user_id, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level()))
+                    user_id, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🟩"*amount + "⬜️"*(3-amount))
             else:
                 bot.send_message(
-                    user_id, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🍺"*dw.level_of_thirst(gnome.get_thirst_level())+"\nЗапасы пива иссякли!")
+                    user_id, f"Вы угостили {tw.inflect_to_accusative(gnome.name)} пивом!\nУровень жажды: " + "🟩"*amount + "⬜️"*(3-amount)+"\nЗапасы пива иссякли!")
         else:
             bot.send_message(
                 user_id, f"Запасы пива иссякли - скорее отправляйтесь на поиски!")

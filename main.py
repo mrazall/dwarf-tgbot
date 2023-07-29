@@ -803,7 +803,7 @@ def schedule_checker_thirst():
 def schedule_checker_tickets():
     while True:
         with sq.connect("gnomes.db") as con:
-            sleep(60*60)
+            sleep(60*60*4)
             cursor = con.cursor()
             cursor.execute("SELECT user_id FROM users_gnomes WHERE is_dead!=1")
             user_ids = cursor.fetchall()
@@ -814,7 +814,7 @@ def schedule_checker_tickets():
 def schedule_checker_mining():
     while True:
         with sq.connect("gnomes.db") as con:
-            sleep(60*60)
+            sleep(60*60*3)
             cursor = con.cursor()
             cursor.execute(
                 "SELECT user_id FROM users_gnomes WHERE pickaxe_level!=0 AND pickaxe_durability!=0 AND is_dead!=1")

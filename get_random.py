@@ -17,6 +17,6 @@ def random_output():
     
 
 def random_pickaxe():
-    a = random.randint(1000, 10300)
+    a = random.randint(1000, 5300)
     return (a//1000)
 

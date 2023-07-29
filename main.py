@@ -44,7 +44,7 @@ with sq.connect("gnomes.db") as con:
                 """)
 
 
-bot = telebot.TeleBot("6449445883:AAHhOqIfbNy_nQT1r2Xqu-t_6SXaChekzao")
+bot = telebot.TeleBot("6370080307:AAEm_cm-4O06Ond8OzUA0ht4Koo3OOljsZY")
 
 
 def create_gnome(user_id, gnome_name):
@@ -245,14 +245,16 @@ def buy_meat(user_id):
             if row:
                 amount_of_gold, amount_of_meat, shop = row
                 if amount_of_gold >= cost:
+                    if shop < 1:
+                        return -1
                     amount_of_gold -= cost
                     amount_of_meat += 1
                     shop-=1
                     cursor.execute("UPDATE users_gnomes SET gold=?, meat=?,shop_meat = ?  WHERE user_id=? AND is_dead!=1", (
                         amount_of_gold, amount_of_meat,shop ,user_id,))
-                    return True
+                    return 1
                 else:
-                    return False
+                    return 0
 
 
 def buy_beer(user_id):
@@ -267,14 +269,16 @@ def buy_beer(user_id):
             if row:
                 amount_of_gold, amount_of_beer, shop = row
                 if amount_of_gold >= cost:
+                    if shop < 1:
+                        return -1
                     amount_of_gold -= cost
                     amount_of_beer += 1
                     shop -=1
                     cursor.execute("UPDATE users_gnomes SET gold=?, beer=? WHERE user_id=? AND is_dead!=1", (
                         amount_of_gold, amount_of_beer, shop, user_id,))
-                    return True
+                    return 1
                 else:
-                    return False
+                    return 0
 
 
 def buy_pickaxe_upgrade(user_id):
@@ -623,17 +627,25 @@ def handle_callback_query(call):
         bot.answer_callback_query(
             call.id, text="Вы решили не обновлять ⛏кирку⛏.")
     elif data == "buy_meat_in_shop":
-        if buy_meat(user_id):
+        res = buy_meat(user_id)
+        if res == 1:
             bot.answer_callback_query(
                 call.id, text="Вы купили 🍖!")
+        elif res == -1:
+            bot.answer_callback_query(
+                call.id, text="К сожалению, этот товар закончился.")
         else:
             bot.answer_callback_query(
                 call.id, text="К сожалению, у вас не хватает средств.")
 
     elif data == "buy_beer_in_shop":
-        if buy_beer(user_id):
+        res = buy_beer(user_id)
+        if res == 1:
             bot.answer_callback_query(
                 call.id, text="Вы купили 🍺!")
+        elif res == -1:
+            bot.answer_callback_query(
+                call.id, text="К сожалению, этот товар закончился.")
         else:
             bot.answer_callback_query(
                 call.id, text="К сожалению, у вас не хватает средств.")

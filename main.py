@@ -432,7 +432,7 @@ def increase_thirst_level(user_id):
                     "UPDATE users_gnomes SET beer=? WHERE user_id=?", (beer, user_id))
                 return 1
 
-
+#fjdkjf
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.from_user.id

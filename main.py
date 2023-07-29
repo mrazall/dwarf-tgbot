@@ -146,17 +146,17 @@ def chat_show_my_gnomes(message, user_id):
             current_date = datetime.now().date()
             date_difference = current_date - date_from_string
             if row[-1]:
-                response += f"{row[0]} прожил с вами {date_difference.days}.\n"
+                response += f"{row[0]} прожил с вами {tw.plural_days(date_difference.days)}.\n"
             else:
                 amount_of_tickets = show_tickets(user_id)
                 if amount_of_tickets != 0:
-                    response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
+                    response += f"{row[0]} живет с вами {tw.plural_days(date_difference.days)}.\nУровень насыщенения: " + \
                         "🟩" * \
                         dw.level_of_hunger(
                             row[2]) + (5 - dw.level_of_hunger(
                                 row[2]))*"⬜️"+"\nУровень жажды: " + "🟩"*dw.level_of_thirst(row[3]) + "⬜️"*(3-dw.level_of_thirst(row[3])) + '\nУровень сил:'+show_tickets(user_id)*"🔋" + (3-show_tickets(user_id))*"🪫"
                 else:
-                    response += f"{row[0]} живет с вами {date_difference.days} дней.\nУровень насыщенения: " + \
+                    response += f"{row[0]} живет с вами {tw.plural_days(date_difference.days)}.\nУровень насыщенения: " + \
                         "🟩" * \
                         dw.level_of_hunger(
                             row[2]) + (5 - dw.level_of_hunger(

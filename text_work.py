@@ -68,3 +68,12 @@ def detect_gender(word, word_in_male, word_in_female):
     else:
         return word_in_male
 
+
+def plural_days(n):
+    if n % 10 == 1 and n % 100 != 11:
+        return f"{n} день"
+    elif 2 <= n % 10 <= 4 and (n % 100 < 10 or n % 100 >= 20):
+        return f"{n} дня"
+    else:
+        return f"{n} дней"
+

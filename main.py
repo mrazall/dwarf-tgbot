@@ -293,8 +293,6 @@ def buy_pickaxe_upgrade(user_id):
                     pickaxe_level += 1
                     if pickaxe_level < 11:
                         tool = pic.Pickaxe(pickaxe_level, 500)
-                        tool.durability
-
                         cursor.execute("""UPDATE users_gnomes 
                                     SET gold=?, 
                                     pickaxe_level=?, 

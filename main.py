@@ -44,7 +44,7 @@ with sq.connect("gnomes.db") as con:
                 """)
 
 
-bot = telebot.TeleBot("6370080307:AAEm_cm-4O06Ond8OzUA0ht4Koo3OOljsZY")
+bot = telebot.TeleBot("YOUR_TOKEN")
 
 
 def create_gnome(user_id, gnome_name):
